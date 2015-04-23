@@ -1,3 +1,6 @@
+class CompilationError(Exception):
+    pass
+
 class Token:
     def __init__(self, type, value):
         self.type = type
@@ -18,7 +21,7 @@ def new_token(char):
     elif char.isdigit():
         return Token("NUMBER", char)
     else:
-        raise Exception("Unknown character: \"{0}\"".format(char))
+        raise CompilationError("Unknown character: \"{0}\"".format(char))
 
 def continue_token(current, char):
     if current.type == "NUMBER":
@@ -62,7 +65,7 @@ def create_groups_by_priority(group):
             v = group[i]
             if isinstance(v, Token) and v.type == "OP" and v.value in op:
                 if i == 0 or i == len(group) - 1:
-                    raise Exception("No argument for operation")
+                    raise CompilationError("No argument for operation")
                 group[i - 1:i + 2] = [[group[i - 1], group[i], group[i + 1]]]
             i += 1
 
@@ -76,7 +79,7 @@ def build_tree(tokens):
             current_group = []
         elif i.type == "END_BRACKET":
             if len(group_stack) == 0:
-                raise Exception("Wrong closing bracket")
+                raise CompilationError("Wrong closing bracket")
             else:
                 if len(current_group) == 1:
                     current_group = current_group[0]
@@ -88,7 +91,7 @@ def build_tree(tokens):
             current_group.append(i)
 
     if len(group_stack) > 0:
-        raise Exception("Not enough closing brackets")
+        raise CompilationError("Not enough closing brackets")
 
     create_groups_by_priority(current_group)
 
@@ -114,29 +117,33 @@ def execute(tree):
         if tree.type == "NUMBER":
             return tree.value
         else:
-            raise Exception("Unexpected token")
+            raise CompilationError("Unexpected token")
     else:
         if len(tree) == 1:
             return execute(tree[0])
+        elif len(tree) != 3:
+            raise CompilationError("Not enough operations")
+        else:
+            tree[0] = execute(tree[0])
+            tree[2] = execute(tree[2])
 
-        tree[0] = execute(tree[0])
-        tree[2] = execute(tree[2])
+        if isinstance(tree[1], Token) and tree[1].type == "OP":
+            if tree[1].value == "+":
+                return tree[0] + tree[2]
+            elif tree[1].value == "-":
+                return tree[0] - tree[2]
+            elif tree[1].value == "*":
+                return tree[0] * tree[2]
+            elif tree[1].value == "/":
+                return tree[0] / tree[2]
+        else:
+            raise CompilationError("Unexpected token")
 
-    if isinstance(tree[1], Token) and tree[1].type == "OP":
-        if tree[1].value == "+":
-            return tree[0] + tree[2]
-        elif tree[1].value == "-":
-            return tree[0] - tree[2]
-        elif tree[1].value == "*":
-            return tree[0] * tree[2]
-        elif tree[1].value == "/":
-            return tree[0] / tree[2]
-    else:
-        raise Exception("Unexpected token")
-
-    
-expr = input("Expression: ")
-tokens = parse(expr)
-tree = build_tree(tokens)
-print_tree(tree)
-print("Result: ", execute(tree))
+try:
+    expr = input("Expression: ")
+    tokens = parse(expr)
+    tree = build_tree(tokens)
+    print_tree(tree)
+    print("Result: ", execute(tree))
+except CompilationError as e:
+    print("Compilation error: {0}".format(e))
